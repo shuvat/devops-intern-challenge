@@ -57,13 +57,31 @@ end of file on stdin at conffile prompt
 
 ## Defect 3: Tests still fail after fixing defect 2
 
-### Symptom / error output
+### Symptom / error output:
+- Same 502 / `Connection refused`, but now to the correct address: `upstream: "http://172.20.0.2:8080/api/info"` (the backend container's IP).
+- The backend prints `loaded config key: service` only after the tests had already failed and the stack was shutting down.
 
-### How I diagnosed it
+
+### How I diagnosed it:
+- Since routing was now correct, the backend itself wasn't accepting connections yet.
+- Read `backend/app.py`: `load_config()` sleeps `CONFIG_FETCH_SECONDS` (2s) per key × 4 keys = ~8s before the server binds port 8080.
+- Checked `docker-compose.yml`: plain `depends_on` only waits for the container to start, not for the app inside it to be ready.
+
 
 ### Root cause
+- Startup race: the test-runner starts ~instantly and hits the proxy while the backend is still loading config and not listening.
+- `depends_on` gave a false sense of ordering: the container was "running" but the service wasn't ready.
 
-### Fix, and why I chose it over the alternatives
+
+### Fix, and why I chose it over the alternatives:
+- Added a `healthcheck` to `backend` that calls its own `/health` endpoint (Python urllib, since the alpine image has no curl).
+- Changed `proxy` to `depends_on: backend: condition: service_healthy`. The proxy, and therefore the test-runner, only starts once the backend actually responds.
+- Verified: 4 consecutive runs of `./scripts/run-tests.sh` all exit 0.
+- Alternatives rejected:
+  - `sleep N` before tests: a guess, still fails on a slower machine and wastes time on a faster one.
+  - Retry loop in the tests: modifies/weakens the tests (forbidden), and would mask a backend that's really down.
+  - `CONFIG_FETCH_SECONDS=0`: changes the behaviour of the service under test, so the tests no longer reflect reality.
+  - Healthcheck waits for a real readiness signal, works at any speed, and touches neither the tests nor `app.py`.
 
 ---
 
