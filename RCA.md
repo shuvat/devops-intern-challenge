@@ -28,19 +28,30 @@ end of file on stdin at conffile prompt
 ### Fix
 - Moved `COPY nginx.conf` **after** the `RUN apt-get install` layer: nginx installs cleanly with its default config, then the file overwrites it.
 - Verified: the build log shows `[proxy 2/3] RUN apt-get ...` then `[proxy 3/3] COPY nginx.conf`, and the build finishes successfully.
-- Side benefit: editing `nginx.conf` now only rebuilds the COPY layer, so the package install stays cached.
+
 
 ---
 
 ## Defect 2: Proxy cannot reach the backend
 
 ### Symptom / error output
+- `/nginx-health` passes, `/api/info` fails: `TEST RUNNER CRASHED: HTTP Error 502: Bad Gateway`
+- nginx log: `connect() failed (111: Connection refused) while connecting to upstream ... upstream: "http://127.0.0.1:8080/api/info"`
 
-### How I diagnosed it
+
+### How I diagnosed it:
+- 502 means nginx received the request but couldn't reach its upstream, so the problem is behind the proxy.
+- The `upstream:` field in the nginx error log shows the address it tried: `127.0.0.1:8080`.
+- Checked `proxy/nginx.conf`: `upstream app_backend { server 127.0.0.1:8080; }`
 
 ### Root cause
+- Each container has its own network namespace. Inside the proxy container, `127.0.0.1` is the proxy container itself, and nothing listens on 8080 there.
+- The backend runs in a separate container. Compose services reach each other by **service name** through Compose's internal DNS, not via localhost.
+
 
 ### Fix
+- in file`proxy/nginx.conf`: `server 127.0.0.1:8080;` → `server backend:8080;`
+- Verified: the nginx log now shows `upstream: "http://172.20.0.2:8080/..."`, the backend container's IP, so routing works.
 
 ---
 
