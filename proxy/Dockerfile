@@ -1,12 +1,12 @@
 # Proxy image inherited from the previous team.
 
-FROM ubuntu:24.04
+FROM nginx:1.27-alpine
+
 
 COPY nginx.conf /etc/nginx/nginx.conf
 
-RUN apt-get update && \
-    apt-get install -y nginx curl htop vim git
+USER nginx
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]
