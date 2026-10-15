@@ -119,6 +119,10 @@ Optional. Answer only the ones you got to — number them, skip the rest.
 >
 1. Proxy image size (measured with `docker images`)
    - Before (ubuntu:24.04 + nginx curl htop vim git): 452MB on disk / 124MB compressed
+   - After (nginx:1.27-alpine): 73.6MB on disk / 21MB compressed
+   - Changes:
+     - Switched base image to the official `nginx:1.27-alpine` (version pinned for reproducible builds). nginx ships preinstalled, so no apt-get layer.
+     - Dropped `curl htop vim git`: debugging/dev tools that nginx doesn't need at runtime. Fewer packages = smaller image and smaller attack surface (fewer CVEs, fewer tools for an attacker inside the container).
 ---
 
 ## Anything you would do differently with more time
