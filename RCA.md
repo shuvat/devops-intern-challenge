@@ -124,5 +124,16 @@ Optional. Answer only the ones you got to — number them, skip the rest.
      - Switched base image to the official `nginx:1.27-alpine` (version pinned for reproducible builds). nginx ships preinstalled, so no apt-get layer.
      - Dropped `curl htop vim git`: debugging/dev tools that nginx doesn't need at runtime. Fewer packages = smaller image and smaller attack surface (fewer CVEs, fewer tools for an attacker inside the container).
 ---
+2. Run the proxy as non-root
+   - Added `USER nginx` (the unprivileged user that ships with the official image) after `COPY`, so `nginx.conf` stays root-owned and read-only for the process.
+   - Changes needed so nginx works without root:
+     - `listen 80` → `listen 8080`: ports below 1024 need root. Updated compose to match: `ports: "8081:8080"` and `PROXY_URL=http://proxy:8080` (an env var, not a change to the test code).
+     - `pid /tmp/nginx.pid`: the default `/var/run/nginx.pid` isn't writable by a non-root user.
+     - `*_temp_path /tmp/...`: temp buffers moved out of root-owned `/var/cache/nginx`.
+   - Verified:
+     - `docker run --rm devops-intern-challenge-proxy whoami` → `nginx`
+     - The tests pass.
+     - The entrypoint now logs `can not modify /etc/nginx/conf.d/default.conf`, confirming the process can't modify system config files.
+   - Why: principle of least privilege. nginx faces external traffic, so if it's compromised, the attacker gets an unprivileged user instead of root in the container.
 
 ## Anything you would do differently with more time
