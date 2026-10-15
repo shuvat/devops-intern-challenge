@@ -89,9 +89,12 @@ end of file on stdin at conffile prompt
 
 > Found first: it blocks running the suite locally too, not just in CI.
 ### Symptom / error output
-- `./scripts/run-tests.sh` → `bash: ./scripts/run-tests.sh: Permission denied`
-- CI runs the same command, so it fails the same way.
-
+- Locally: `./scripts/run-tests.sh` → `bash: ./scripts/run-tests.sh: Permission denied`
+- In CI (run #1 on `main`):
+Run ./scripts/run-tests.sh
+/home/runner/work/_temp/<id>.sh: line 1: ./scripts/run-tests.sh: Permission denied
+Error: Process completed with exit code 126.
+- Exit code 126 = "command found but not executable".
 ### How I diagnosed it
 - `ls -l scripts/` → `-rw-r--r--`: no execute bit.
 - `git ls-files -s scripts/` → `100644`: git stores the script as non-executable, so every fresh clone (including the CI runner) gets it that way.
@@ -104,14 +107,8 @@ end of file on stdin at conffile prompt
 - Rejected alternatives:
   - `chmod +x` without committing: fixes only my machine.
   - `bash scripts/run-tests.sh` or a `chmod` step in `ci.yml`: CI goes green, but the next person cloning the repo still gets `Permission denied`.
+  - Verified: CI run #2 on `fix/devops-challenge` is green.
 
-### Symptom / error output
-
-### How I diagnosed it
-
-### Root cause
-
-### Fix
 
 ---
 
